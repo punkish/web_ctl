@@ -1,5 +1,3 @@
-#!/Users/punkish/perl5/perlbrew/perls/perl-5.14.1/bin/perl
-
 #/usr/bin/env perl
 
 =begin
@@ -48,14 +46,11 @@ Required, a configuration file referenced above in $cnf containing the following
     test => 0,                                      # Set 'test' => 1 to print the $cmd on STDOUT instead of running it
     envs => 'development',  # 'production';         # Change the 'environment' as needed
     apps => {                                       # Add apps and the ports they would run on
-        all        => '',                           #   Note: 'all' is a special app. Don't change this.
-        blog       => 5000,
-        macrostrat => 5001,
-        macromap   => 5002,
-        geomaps    => 5003,
-        pbdb       => 5004,
-        sue        => 5005,
-        punkish    => 5006
+        all  => '',                                 #   Note: 'all' is a special app. Don't change this.
+        blog => 5000,
+        app1 => 5001,
+        app2 => 5002,
+        app3 => 5003
     }
 );
 
