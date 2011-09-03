@@ -1,36 +1,32 @@
-#/usr/bin/env perl
+#!/usr/bin/env perl
 
-=begin
-
-===============================================================================
-
-        FILE:  web_ctl.pl
-
-       USAGE:  ./web_ctl.pl <command> [<application>]
-
- DESCRIPTION:  A command line interface to Starman-powered Dancer applications
-
-     OPTIONS:  ---
-REQUIREMENTS:  ---
-        BUGS:  ---
-       NOTES:  ---
-      AUTHOR:  Puneet Kishor (Pk), <punkish@eidesis.org>
-     COMPANY:  eidesis
-     VERSION:  1.0
-     CREATED:  07/17/2011 15:01:54 CDT
-    REVISION:  ---
-     LICENSE:  Released with a CC0 License Waiver.
-               If you use my work, or improve on it, it would be nice if you 
-               gave me credit, but you don't have to. Use it, make it better, 
-               pass it on.
-===============================================================================
-
-=cut
+# ===============================================================================
+# 
+#         FILE:  web_ctl.pl
+# 
+#        USAGE:  ./web_ctl.pl <command> [<application>]
+# 
+#  DESCRIPTION:  A command line interface to Starman-powered Dancer applications
+# 
+#      OPTIONS:  ---
+# REQUIREMENTS:  ---
+#         BUGS:  ---
+#        NOTES:  ---
+#       AUTHOR:  Puneet Kishor (Pk), <punkish@eidesis.org>
+#      COMPANY:  eidesis
+#      VERSION:  1.0
+#      CREATED:  07/17/2011 15:01:54 CDT
+#     REVISION:  ---
+#      LICENSE:  Released with a CC0 License Waiver.
+#                If you use my work, or improve on it, it would be nice if you 
+#                gave me credit, but you don't have to. Use it, make it better, 
+#                pass it on.
+# ===============================================================================
 
 use 5.14.1;
 use strict;
 
-my $cnf = '/Users/punkish/bin/web_ctl.conf';
+my $cnf = '/Users/punkish/bin/web_ctl/web_ctl.conf';
 
 =begin
 
@@ -195,7 +191,7 @@ sub start {
         "--error-log $CFG::CFG{dirs}{logs}/$error",
         "-D ",
         "--pid $CFG::CFG{dirs}{pids}/$pid",
-        "-a $CFG::CFG{appd}/$app/bin/app.pl"
+        "-a $CFG::CFG{dirs}{appd}/$app/bin/app.pl"
     );
     if ($CFG::CFG{test}) {
         say join(" ", @cmd);
