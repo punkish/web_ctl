@@ -23,15 +23,17 @@
 #                pass it on.
 # ===============================================================================
 
-use 5.14.1;
+use 5.10.1;
 use strict;
 
+# Edit $cnf to point to the conf file. This is the *only* edit required in this script.
 my $cnf = '/Users/punkish/bin/web_ctl/web_ctl.conf';
 
 =begin
 
 Required, a configuration file referenced above in $cnf containing the following code
 
+# web_ctl.conf
 %CFG = (
     host => 'http://127.0.0.1',
     dirs => {                                       # full path to directories that 
@@ -121,6 +123,7 @@ sub restart {
     my ($app) = @_;
     
     stop($app);
+    sleep 2;
     start($app);
 }
 
@@ -136,8 +139,8 @@ sub stop {
     my $pid    = $app . '.pid';
     
     unless (-e "$CFG::CFG{dirs}{pids}/$pid") {
-        say "The app $app doesn't seem to be running... exiting.";
-        exit;
+        say "The app $app doesn't seem to be running... nothing to do.";
+        return;
     }
     
     my $cmd = "kill `head -1 $CFG::CFG{dirs}{pids}/$pid`";
@@ -152,7 +155,7 @@ sub stop {
 
 sub start_all {
     for my $app (keys %{$CFG::CFG{apps}}) {
-	start($app) unless $app eq 'all';
+	   start($app) unless $app eq 'all';
     }
 }
 
@@ -166,16 +169,16 @@ sub start {
     
     my $prompt = '';
     if (-e "$CFG::CFG{dirs}{pids}/$pid") {
-        while ($prompt ne 'q' and $prompt ne 'y') {
-            print "The app $app seems to be running. Enter 'q' to quit, or 'y' to kill it and restart: ";
+        while ($prompt ne 'c' and $prompt ne 'k') {
+            print "The app $app is running. Enter 'k' to kill and restart it, 'c' to cancel this program: ";
             chomp($prompt = <STDIN>);
         }
         
-        if ($prompt eq 'q') {
+        if ($prompt eq 'c') {
             say "Exiting without starting $app";
             exit;
         }
-        elsif ($prompt eq 'y') {
+        elsif ($prompt eq 'k') {
             say "Attempting to stop $app";
             stop($app);
         }
@@ -221,10 +224,10 @@ sub status {
             my $pid_in_file = qx{head -1 "$CFG::CFG{dirs}{pids}/$pidfile"}; #"
             
             if ($pid_in_file == $pid) {
-                my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$CFG::CFG{pids}/$pidfile");
+                my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$CFG::CFG{dirs}{pids}/$pidfile");
                 my $app = $pidfile;
                 $app =~ s/\.pid$//;
-                say "'$app' has been running since " . localtime($mtime) . ". Browse it at $CFG::CFG{host}:${$CFG::CFG{apps}}{$app}/";
+                say "'$app' has been running since " . localtime($ctime) . ". Browse it at $CFG::CFG{host}:${$CFG::CFG{apps}}{$app}/";
                 next PS;
             }
         }
