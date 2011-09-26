@@ -27,7 +27,7 @@ use 5.10.1;
 use strict;
 
 # Edit $cnf to point to the conf file. This is the *only* edit required in this script.
-my $cnf = '/Users/punkish/bin/web_ctl/web_ctl.conf';
+my $cnf = '/Volumes/roller/Users/punkish/bin/web_ctl/web_ctl.conf';
 
 =begin
 
@@ -62,8 +62,19 @@ if (my $err = ReadCfg($cnf)) {
     exit(1);
 }
 
+my $test = $CFG::CFG{test};
+my $host = $CFG::CFG{host};
+my $root = $CFG::CFG{root};
+my $dir_logs = $root . '/' . $CFG::CFG{dirs}{logs};
+my $dir_prod = $root . '/' . $CFG::CFG{dirs}{prod};
+my $dir_test = $root . '/' . $CFG::CFG{dirs}{test};
+my $dir_devl = $root . '/' . $CFG::CFG{dirs}{devl};
+my $dir_pids = $root . '/' . $CFG::CFG{dirs}{pids};
+my %apps = %{$CFG::CFG{apps}};
+
 for (keys %{$CFG::CFG{dirs}}) {
-    die "Please create $CFG::CFG{dirs}{$_}\n" unless (-d $CFG::CFG{dirs}{$_});
+    my $dir = $CFG::CFG{root} . '/' . $CFG::CFG{dirs}{$_};
+    die "Please create $dir\n" unless (-d $dir);
 }
 
 my ($cmd, $app) = @ARGV;
@@ -136,15 +147,16 @@ sub stop_all {
 sub stop {
     my ($app) = @_;
     
-    my $pid    = $app . '.pid';
+    my $env = $apps{$app}->{env};
+    my $pid = $app . '_' . $env . '.pid';
     
-    unless (-e "$CFG::CFG{dirs}{pids}/$pid") {
+    unless (-e "$dir_pids/$pid") {
         say "The app $app doesn't seem to be running... nothing to do.";
         return;
     }
     
-    my $cmd = "kill `head -1 $CFG::CFG{dirs}{pids}/$pid`";
-    if ($CFG::CFG{test}) {
+    my $cmd = "kill `head -1 $dir_pids/$pid`";
+    if ($test) {
         say $cmd;
     }
     else {
@@ -162,13 +174,28 @@ sub start_all {
 sub start {
     my ($app) = @_;
 
-    my $port   = ${$CFG::CFG{apps}}{$app};
+    my $port   = $apps{$app}->{port};
     my $access = $app . '_access.log';
     my $error  = $app . '_error.log';
-    my $pid    = $app . '.pid';
+    my $env    = $apps{$app}->{env};
+    my $pid    = $app . '_' . $env . '.pid';
+    #say "pid: $pid";
+    
+    my $dir_appl = '';
+    if ($env eq 'development') {
+        $dir_appl = $dir_devl;
+        $port += 20000;
+    }
+    elsif ($env eq 'testing') {
+        $dir_appl = $dir_test;
+        $port += 10000;
+    }
+    elsif ($env eq 'production') {
+        $dir_appl = $dir_prod;
+    }
     
     my $prompt = '';
-    if (-e "$CFG::CFG{dirs}{pids}/$pid") {
+    if (-e "$dir_pids/$pid") {
         while ($prompt ne 'c' and $prompt ne 'k') {
             print "The app $app is running. Enter 'k' to kill and restart it, 'c' to cancel this program: ";
             chomp($prompt = <STDIN>);
@@ -183,33 +210,33 @@ sub start {
             stop($app);
         }
     }
-    
+
     my @cmd = (
         "plackup",
         "-s Starman",
         "-p $port",
         "-w 10",
-        "-E $CFG::CFG{envs}",
-        "--access-log $CFG::CFG{dirs}{logs}/$access",
-        "--error-log $CFG::CFG{dirs}{logs}/$error",
-        "-D ",
-        "--pid $CFG::CFG{dirs}{pids}/$pid",
-        "-a $CFG::CFG{dirs}{appd}/$app/bin/app.pl"
+        "-E $env",
+        "--access-log $dir_logs/$access",
+        "--error-log $dir_logs/$error",
+        "-D",
+        "--pid $dir_pids/$pid",
+        "-a $dir_appl/$app/bin/app.pl"
     );
-    if ($CFG::CFG{test}) {
+    if ($test) {
         say join(" ", @cmd);
     }
     else {
         system( join(" ", @cmd) );
     }
-    say "Started $app on port $port. Browse at $CFG::CFG{host}:$port/";
+    say "Started $app on port $port. Browse at $host:$port";
 }
 
 sub status {
-    opendir DIR, $CFG::CFG{dirs}{pids};
+    opendir DIR, $dir_pids;
     my @pidfiles = grep {/\.pid$/} readdir(DIR);
     closedir(DIR);
-
+    
     open(PS_F, "ps -lax | grep '[s]tarman master'|");
     
     PS: while (<PS_F>) {
@@ -221,13 +248,13 @@ sub status {
         my ($uid, $pid, $ppid, $f, $cpu, $pri, $ni, $sz, $rss, $wchan, $s, $addr, $tty, $time, $cmd) = split /\s+/;
         
         for my $pidfile (@pidfiles) {
-            my $pid_in_file = qx{head -1 "$CFG::CFG{dirs}{pids}/$pidfile"}; #"
+            my $pid_in_file = qx{head -1 "$dir_pids/$pidfile"}; #"
             
             if ($pid_in_file == $pid) {
-                my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$CFG::CFG{dirs}{pids}/$pidfile");
+                my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$dir_pids/$pidfile");
                 my $app = $pidfile;
                 $app =~ s/\.pid$//;
-                say "'$app' has been running since " . localtime($ctime) . ". Browse it at $CFG::CFG{host}:${$CFG::CFG{apps}}{$app}/";
+                say "'$app' has been running since " . localtime($ctime) . ". Browse it at $host:$apps{$app}->{port}/";
                 next PS;
             }
         }
