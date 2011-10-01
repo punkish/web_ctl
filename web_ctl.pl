@@ -25,6 +25,7 @@
 
 use 5.10.1;
 use strict;
+use Getopt::Std;
 
 # Edit $cnf to point to the conf file. This is the *only* edit required in this script.
 my $cnf = '/Volumes/roller/Users/punkish/bin/web_ctl/web_ctl.conf';
@@ -35,25 +36,31 @@ Required, a configuration file referenced above in $cnf containing the following
 
 # web_ctl.conf
 %CFG = (
-    host => 'http://127.0.0.1',
-    dirs => {                                       # full path to directories that 
-        logs => '/Users/punkish/Logs',              #   store the logs
-        appd => '/Users/punkish/Documents/www',     #   have all the apps listed below
-        pids => '/Users/punkish/Pids'               #   store the pid files for the running apps
-    },
-    test => 0,                                      # Set 'test' => 1 to print the $cmd on STDOUT instead of running it
-    envs => 'development',  # 'production';         # Change the 'environment' as needed
-    apps => {                                       # Add apps and the ports they would run on
-        all  => '',                                 #   Note: 'all' is a special app. Don't change this.
-        blog => 5000,
-        app1 => 5001,
-        app2 => 5002,
-        app3 => 5003
-    }
+	test => 0,
+	host => 'http://127.0.0.1',
+	root => '/Volumes/roller/Users/punkish',
+	dirs => {
+		logs => 'Logs',
+		prod => 'Sites_production',
+		test => 'Sites_testing',
+		devl => 'Sites_development',
+		pids => 'Pids'
+	},
+	apps => {
+		blog				=> {port => 5000},
+		macrostrat			=> {port => 5001},
+		macromap			=> {port => 5002},
+		geomaps				=> {port => 5003},
+		pbdb				=> {port => 5004},
+		sue					=> {port => 5005},
+		punkish				=> {port => 5006},
+		humanesettlements	=> {port => 5007},
+		geoplates			=> {port => 5008},
+	ecoval					=> {port => 5009}
+	}
 );
 
 =cut
-
 
 # Get our configuration information
 # From http://www.perlmonks.org/?node_id=464358
@@ -72,34 +79,71 @@ my $dir_devl = $root . '/' . $CFG::CFG{dirs}{devl};
 my $dir_pids = $root . '/' . $CFG::CFG{dirs}{pids};
 my %apps = %{$CFG::CFG{apps}};
 
+# Read the command line arguments
+our ($opt_c, $opt_a, $opt_e);
+getopt('cae');
+
+
+#### Check the command line arguments
+# Check the commands
+my @cmds = qw(start restart stop status help);
+if ($opt_c eq 'help') {
+    usage("Please provide arguments as follows:");
+    exit;
+}
+elsif (!in_array($opt_c, @cmds) ) {
+    usage("Please provide a valid command as follows:");
+    exit;
+}
+
+# Check the environment
+if ($opt_e ne 'development' && $opt_e ne 'production') {
+    usage("Please provide environment as follows:");
+    exit;
+}
+
+# Check the application
+if ($opt_a ne 'all' && !in_array($opt_a, keys %apps) ) {
+    usage("Please provide a valid application as follows:");
+    exit;
+}
+
+# Check if the directories exist
 for (keys %{$CFG::CFG{dirs}}) {
     my $dir = $CFG::CFG{root} . '/' . $CFG::CFG{dirs}{$_};
     die "Please create $dir\n" unless (-d $dir);
 }
 
-my ($cmd, $app) = @ARGV;
-
-my @cmds = qw(start restart stop status help);
-
-if ($cmd eq 'help' || @ARGV < 1) {
-    usage("Please provide arguments as follows:");
-    exit;
-}
-elsif (! in_array($cmd, @cmds) ) {
-    usage("Please provide a valid command as follows:");
-    exit;
+if ($opt_a eq 'all') {
+    $opt_c .= 'all';
 }
 
-if ($cmd eq 'help' || $cmd ne 'status') {
-    if (! in_array($app, keys %{$CFG::CFG{apps}}) ) {
-        usage("Please provide a valid application as follows:");
-        exit;
-    }
-    
-    $cmd .= ($app eq 'all') ? '_all': "('$app')";
-}
+my $dispatch = {
+    stop_all    => \&stop_all,
+    stop        => \&stop,
+    start_all   => \&start_all,
+    start       => \&start,
+    status_all  => \&status_all,
+    status      => \&status,
+    restart_all => \&restart_all,
+    restart     => \&restart
+};
 
-eval $cmd;
+# Run the command
+$dispatch->{$opt_c}->($opt_a);
+
+
+sub usage {
+    my $mesg = shift;
+    my $cmds = join " | ", @cmds; $cmds = 'all | ' . $cmds;
+    my $apps = join " | ", keys %{$CFG::CFG{apps}};
+    say "\n***********************************************************\n" . 
+        "USAGE: $mesg\n" . 
+        "web_ctl.pl -c <command> -a [<application>] -e [development | production]\n" . 
+        "- <command> = ($cmds)\n" . 
+        "- <application> = ($apps)\n" .  
+        "************************************************************";
+}
 
 sub in_array {
     my ($arg, @arr) = @_;
@@ -110,45 +154,85 @@ sub in_array {
     return 0;
 }
 
-sub usage {
-    my $mesg = shift;
-    my $cmds = join " | ", @cmds;
-    my $apps = join " | ", keys %{$CFG::CFG{apps}};
-    say "\n***********************************************************\n" . 
-        "USAGE: $mesg\n" . 
-        "web_ctl.pl <command> [<application>]\n" . 
-        "- <command> = ($cmds)\n" . 
-        "- <application> = ($apps)\n" . 
-        "  Note: <application> is not required for 'status' or 'help'\n" . 
-        "************************************************************";
+# From http://www.perlmonks.org/?node_id=464358
+sub ReadCfg {
+    my $file = $_[0];
+
+    our $err;
+
+    # Put config data into a separate namespace
+    {
+        package CFG;
+
+        # Process the contents of the config file
+        my $rc = do($file);
+
+        # Check for errors
+        if ($@) {
+            $::err = "ERROR: Failure compiling '$file' - $@";
+        }
+        elsif (! defined($rc)) {
+            $::err = "ERROR: Failure reading '$file' - $!";
+        }
+        elsif (! $rc) {
+            $::err = "ERROR: Failure processing '$file'";
+        }
+    }
+
+    return ($err);
 }
 
-sub restart_all {   
-    for my $app (keys %{$CFG::CFG{apps}}) {
-        stop($app);
-        start($app);
+sub status_all {
+    for my $app (keys %apps) {
+        status($app);
     }
 }
 
-sub restart {
+sub status {
     my ($app) = @_;
     
-    stop($app);
-    sleep 2;
-    start($app);
+    my $pidfile = $app . '_' . $opt_e . '.pid';
+
+    if (-e "$dir_pids/$pidfile") {
+        open(PS_F, "ps -lax | grep '[s]tarman master'|");
+        
+        PS: while (<PS_F>) {
+            chomp;
+            $_ = trim($_);
+            
+            #  UID   PID  PPID        F CPU PRI NI       SZ    RSS WCHAN     S             ADDR TTY           TIME CMD
+            #  501  4882     1      104   0  31  0  2469860   4656 -      Ss   ffffff800e37f740 ??         0:00.08 starman master 
+            my ($uid, $pid, $ppid, $f, $cpu, $pri, $ni, $sz, $rss, $wchan, $s, $addr, $tty, $time, $cmd) = split /\s+/;
+            
+            my $pid_in_file = qx{head -1 "$dir_pids/$pidfile"}; #"
+                
+            if ($pid_in_file == $pid) {
+                my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$dir_pids/$pidfile");
+                say "application: $app";
+                say "    running since: " . localtime($ctime);
+                say "    in mode      : " . $opt_e;
+                say "    browse at    : " . $host . ':' . $apps{$app}->{port} . "/\n";
+                last PS;
+            }
+        }
+        
+        close(PS_F);
+    }
+    else {
+        say "'$app' doesn't seem to be running in mode '$opt_e'";
+    }
 }
 
 sub stop_all {
-    for my $app (keys %{$CFG::CFG{apps}}) {
-        stop($app) unless $app eq 'all';
+    for my $app (keys %apps) {
+        stop($app);
     }
 }
 
 sub stop {
     my ($app) = @_;
     
-    my $env = $apps{$app}->{env};
-    my $pid = $app . '_' . $env . '.pid';
+    my $pid = $app . '_' . $opt_e . '.pid';
     
     unless (-e "$dir_pids/$pid") {
         say "The app $app doesn't seem to be running... nothing to do.";
@@ -166,8 +250,8 @@ sub stop {
 }
 
 sub start_all {
-    for my $app (keys %{$CFG::CFG{apps}}) {
-	   start($app) unless $app eq 'all';
+    for my $app (keys %apps) {
+	   start($app);
     }
 }
 
@@ -177,7 +261,7 @@ sub start {
     my $port   = $apps{$app}->{port};
     my $access = $app . '_access.log';
     my $error  = $app . '_error.log';
-    my $env    = $apps{$app}->{env};
+    my $env    = $opt_e;
     my $pid    = $app . '_' . $env . '.pid';
     #say "pid: $pid";
     
@@ -232,35 +316,19 @@ sub start {
     say "Started $app on port $port. Browse at $host:$port";
 }
 
-sub status {
-    opendir DIR, $dir_pids;
-    my @pidfiles = grep {/\.pid$/} readdir(DIR);
-    closedir(DIR);
-    
-    open(PS_F, "ps -lax | grep '[s]tarman master'|");
-    
-    PS: while (<PS_F>) {
-        chomp;
-        $_ = trim($_);
-        
-        #  UID   PID  PPID        F CPU PRI NI       SZ    RSS WCHAN     S             ADDR TTY           TIME CMD
-        #  501  4882     1      104   0  31  0  2469860   4656 -      Ss   ffffff800e37f740 ??         0:00.08 starman master 
-        my ($uid, $pid, $ppid, $f, $cpu, $pri, $ni, $sz, $rss, $wchan, $s, $addr, $tty, $time, $cmd) = split /\s+/;
-        
-        for my $pidfile (@pidfiles) {
-            my $pid_in_file = qx{head -1 "$dir_pids/$pidfile"}; #"
-            
-            if ($pid_in_file == $pid) {
-                my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$dir_pids/$pidfile");
-                my $app = $pidfile;
-                $app =~ s/\.pid$//;
-                say "'$app' has been running since " . localtime($ctime) . ". Browse it at $host:$apps{$app}->{port}/";
-                next PS;
-            }
-        }
+sub restart_all {   
+    for my $app (keys %apps) {
+        stop($app);
+        start($app);
     }
+}
+
+sub restart {
+    my ($app) = @_;
     
-    close(PS_F);
+    stop($app);
+    sleep 2;
+    start($app);
 }
 
 sub trim {
@@ -270,32 +338,4 @@ sub trim {
         $string =~ s/\s+$//;
         return $string;
     }
-}
-
-# From http://www.perlmonks.org/?node_id=464358
-sub ReadCfg {
-    my $file = $_[0];
-
-    our $err;
-
-    # Put config data into a separate namespace
-    {
-        package CFG;
-
-        # Process the contents of the config file
-        my $rc = do($file);
-
-        # Check for errors
-        if ($@) {
-            $::err = "ERROR: Failure compiling '$file' - $@";
-        }
-        elsif (! defined($rc)) {
-            $::err = "ERROR: Failure reading '$file' - $!";
-        }
-        elsif (! $rc) {
-            $::err = "ERROR: Failure processing '$file'";
-        }
-    }
-
-    return ($err);
 }
