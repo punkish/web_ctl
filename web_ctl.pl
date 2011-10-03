@@ -115,7 +115,7 @@ for (keys %{$CFG::CFG{dirs}}) {
 }
 
 if ($opt_a eq 'all') {
-    $opt_c .= 'all';
+    $opt_c .= '_all';
 }
 
 my $dispatch = {
