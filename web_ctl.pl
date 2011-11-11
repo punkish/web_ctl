@@ -36,6 +36,7 @@ Required, a configuration file referenced above in $cnf containing the following
 
 # web_ctl.conf
 %CFG = (
+	default_workers => 5,
 	test => 0,
 	host => 'http://127.0.0.1',
 	root => '/Volumes/roller/Users/punkish',
@@ -50,7 +51,7 @@ Required, a configuration file referenced above in $cnf containing the following
 		blog				=> {port => 5000},
 		macrostrat			=> {port => 5001},
 		macromap			=> {port => 5002},
-		geomaps				=> {port => 5003},
+		geomaps				=> {port => 5003, workers => 10},
 		pbdb				=> {port => 5004},
 		sue					=> {port => 5005},
 		punkish				=> {port => 5006},
@@ -69,6 +70,7 @@ if (my $err = ReadCfg($cnf)) {
     exit(1);
 }
 
+my $default_workers = $CFG::CFG{default_workers};
 my $test = $CFG::CFG{test};
 my $host = $CFG::CFG{host};
 my $root = $CFG::CFG{root};
@@ -259,6 +261,7 @@ sub start {
     my ($app) = @_;
 
     my $port   = $apps{$app}->{port};
+	my $workers = $apps{$app}->{workers} || $default_workers;
     my $access = $app . '_access.log';
     my $error  = $app . '_error.log';
     my $env    = $opt_e;
@@ -299,7 +302,7 @@ sub start {
         "plackup",
         "-s Starman",
         "-p $port",
-        "-w 10",
+        "-w $workers",
         "-E $env",
         "--access-log $dir_logs/$access",
         "--error-log $dir_logs/$error",
