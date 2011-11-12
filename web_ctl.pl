@@ -17,10 +17,11 @@
 #      VERSION:  1.0
 #      CREATED:  07/17/2011 15:01:54 CDT
 #     REVISION:  ---
-#      LICENSE:  Released with a CC0 License Waiver.
+#      LICENSE:  Released under a CC0 License Waiver.
 #                If you use my work, or improve on it, it would be nice if you 
 #                gave me credit, but you don't have to. Use it, make it better, 
 #                pass it on.
+#                See http://creativecommons.org/about/cc0 for details.
 # ===============================================================================
 
 use 5.10.1;
