@@ -4,7 +4,7 @@
 # 
 #         FILE:  web_ctl.pl
 # 
-#        USAGE:  ./web_ctl.pl <command> [<application>]
+#        USAGE:  web_ctl.pl -c <command> -a [<application>] -e [development | production]
 # 
 #  DESCRIPTION:  A command line interface to Starman-powered Dancer applications
 # 
@@ -28,40 +28,8 @@ use strict;
 use Getopt::Std;
 
 # Edit $cnf to point to the conf file. This is the *only* edit required in this script.
-my $cnf = '/Volumes/roller/Users/punkish/bin/web_ctl/web_ctl.conf';
-
-=begin
-
-Required, a configuration file referenced above in $cnf containing the following code
-
-# web_ctl.conf
-%CFG = (
-	default_workers => 5,
-	test => 0,
-	host => 'http://127.0.0.1',
-	root => '/Volumes/roller/Users/punkish',
-	dirs => {
-		logs => 'Logs',
-		prod => 'Sites_production',
-		test => 'Sites_testing',
-		devl => 'Sites_development',
-		pids => 'Pids'
-	},
-	apps => {
-		blog				=> {port => 5000},
-		macrostrat			=> {port => 5001},
-		macromap			=> {port => 5002},
-		geomaps				=> {port => 5003, workers => 10},
-		pbdb				=> {port => 5004},
-		sue					=> {port => 5005},
-		punkish				=> {port => 5006},
-		humanesettlements	=> {port => 5007},
-		geoplates			=> {port => 5008},
-	ecoval					=> {port => 5009}
-	}
-);
-
-=cut
+# See the conf file for syntax and options
+my $cnf = 'web_ctl.conf';
 
 # Get our configuration information
 # From http://www.perlmonks.org/?node_id=464358
@@ -137,14 +105,13 @@ $dispatch->{$opt_c}->($opt_a);
 
 sub usage {
     my $mesg = shift;
-    my $cmds = join " | ", @cmds; $cmds = 'all | ' . $cmds;
-    my $apps = join " | ", keys %{$CFG::CFG{apps}};
-    say "\n***********************************************************\n" . 
-        "USAGE: $mesg\n" . 
+    my $cmds = join " | ", @cmds;
+    my $apps = "\tall\n\t" . join "\n\t", keys %{$CFG::CFG{apps}};
+    say "\nUSAGE: $mesg\n" . 
         "web_ctl.pl -c <command> -a [<application>] -e [development | production]\n" . 
-        "- <command> = ($cmds)\n" . 
-        "- <application> = ($apps)\n" .  
-        "************************************************************";
+        "  values for <command> and <application> are as follows\n" . 
+        "  - <command> = ($cmds)\n" . 
+        "  - <application> = (\n$apps\n    )";
 }
 
 sub in_array {
@@ -195,6 +162,8 @@ sub status {
     
     my $pidfile = $app . '_' . $opt_e . '.pid';
 
+    # We get the pid from the pidfile, and then check it against the list 
+    # of processes to determine how long the apps has been running
     if (-e "$dir_pids/$pidfile") {
         open(PS_F, "ps -lax | grep '[s]tarman master'|");
         
