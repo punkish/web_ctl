@@ -180,10 +180,10 @@ sub status {
                 
             if ($pid_in_file == $pid) {
                 my ($dev, $ino, $mode, $nlink, $uid, $gid, $rdev, $size, $atime, $mtime, $ctime, $blksize, $blocks) = stat("$dir_pids/$pidfile");
-                say "application: $app";
-                say "    running since: " . localtime($ctime);
-                say "    in mode      : " . $opt_e;
-                say "    browse at    : " . $host . ':' . $apps{$app}->{port} . "/\n";
+                say "application: $app\n" . 
+                    "    running since: " . localtime($ctime) . "\n" . 
+                    "    in mode      : $opt_e\n" . 
+                    "    browse at    : $host" . ':' . $apps{$app}->{port};
                 last PS;
             }
         }
@@ -223,20 +223,19 @@ sub stop {
 
 sub start_all {
     for my $app (keys %apps) {
-	   start($app);
+       start($app);
     }
 }
 
 sub start {
     my ($app) = @_;
 
-    my $port   = $apps{$app}->{port};
-	my $workers = $apps{$app}->{workers} || $default_workers;
-    my $access = $app . '_access.log';
-    my $error  = $app . '_error.log';
-    my $env    = $opt_e;
-    my $pid    = $app . '_' . $env . '.pid';
-    #say "pid: $pid";
+    my $port    = $apps{$app}->{port};
+    my $workers = $apps{$app}->{workers} || $default_workers;
+    my $access  = $app . '_access.log';
+    my $error   = $app . '_error.log';
+    my $env     = $opt_e;
+    my $pid     = $app . '_' . $env . '.pid';
     
     my $dir_appl = '';
     if ($env eq 'development') {
@@ -286,7 +285,7 @@ sub start {
     else {
         system( join(" ", @cmd) );
     }
-    say "Started $app on port $port. Browse at $host:$port";
+    say "Started $app in $env mode. Browse at $host:$port";
 }
 
 sub restart_all {   
